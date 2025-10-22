@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Coverage directory
+coverage
+.eslintcache
+
+# Dependencies
+node_modules
+pos-frontend/node_modules
+pos-backend/node_modules
+
+# Build / release
+release
+dist
+out
+
+# System / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Env files
+.env
+.env.local
+.env.development
+.env.production
+
+# Electron / TypeScript generated files
+*.css.d.ts
+*.sass.d.ts
+*.scss.d.ts
+.erb/dll
