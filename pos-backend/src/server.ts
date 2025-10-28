@@ -1,34 +1,32 @@
 import express from "express";
+import cors from "cors";
 import pool from "./config/db";
 import { initProductTable } from "./models/productModel";
-import productRoute from "./routes/productRoute"
+import productRoute from "./routes/productRoute";
 import { initSalesTable } from "./models/salesModel";
-import salesRoute from "./routes/salesRoute"
-import  reportRoute  from "./routes/reportRoute";
+import salesRoute from "./routes/salesRoute";
+import reportRoute from "./routes/reportRoute";
 
 const app = express();
+
+// Enable CORS
+app.use(
+  cors({
+    origin: "http://localhost:1212", // Electron frontend URL
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// DEBUG MIDDLEWARE - Add this temporarily
-app.use((req, res, next) => {
-  console.log('=== Incoming Request ===');
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('Content-Type:', req.headers['content-type']);
-  console.log('Body:', req.body);
-  console.log('Body type:', typeof req.body);
-  console.log('========================');
-  next();
-});
-
-// Initialize product table
+// Initialize tables
 initProductTable();
 initSalesTable();
 
-// Test DB route 
+// Test DB route
 app.get("/", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -39,10 +37,12 @@ app.get("/", async (req, res) => {
   }
 });
 
-// Use product routes
+// Routes
 app.use("/api/products", productRoute);
-app.use("/api/sales", salesRoute)
+app.use("/api/sales", salesRoute);
 app.use("/api/reports", reportRoute);
 
 const PORT = 5000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`✅ Server running on http://localhost:${PORT}`)
+);

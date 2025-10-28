@@ -1,12 +1,16 @@
 import express from "express";
-import { getDailyReport, getWeeklyReport, getMonthlyReport, getLowStockProducts, getTopProducts } from "../models/reportModel";
+import { dailyReport, weeklyReport, monthlyReport, topProducts, lowStock,
+} from "../controllers/reportController";
 
 const router = express.Router();
 
-router.get("/daily", getDailyReport);
-router.get("/weekly", getWeeklyReport);
-router.get("/monthly", getMonthlyReport);
-router.get("/top-products", getTopProducts);
-router.get("/low-stock", getLowStockProducts);
+// Reports
+router.get("/daily", dailyReport);
+router.get("/weekly", weeklyReport);
+router.get("/monthly", monthlyReport);
+
+// Product performance reports
+router.get("/top-products", topProducts);
+router.get("/low-stock", lowStock);
 
 export default router;
