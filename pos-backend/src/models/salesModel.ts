@@ -17,13 +17,50 @@ export const initSalesTable = async () => {
 
 // Add new sale
 export const addSale = async (productId: number, quantity: number, totalPrice: number) => {
-  const query = `
-    INSERT INTO sales (product_id, quantity, total_price)
-    VALUES ($1, $2, $3)
-    RETURNING *;
-  `;
-  const result = await pool.query(query, [productId, quantity, totalPrice]);
-  return result.rows[0];
+  const client = await pool.connect(); // Get a DB client for the transaction
+
+  try {
+    await client.query("BEGIN");
+
+    // Step 1: Check current stock
+    const productResult = await client.query(
+      "SELECT stock FROM products WHERE id = $1 FOR UPDATE",
+      [productId]
+    );
+
+    if (productResult.rows.length === 0) {
+      throw new Error("Product not found");
+    }
+
+    const currentStock = productResult.rows[0].stock;
+
+    // Step 2: Ensure sufficient stock
+    if (currentStock < quantity) {
+      throw new Error("Not enough stock available");
+    }
+
+    // Step 3: Deduct the sold quantity from stock
+    await client.query(
+      "UPDATE products SET stock = stock - $1 WHERE id = $2",
+      [quantity, productId]
+    );
+
+    // Step 4: Insert the sale
+    const saleResult = await client.query(
+      `INSERT INTO sales (product_id, quantity, total_price)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [productId, quantity, totalPrice]
+    );
+
+    await client.query("COMMIT");
+    return saleResult.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 // Get all sales
@@ -36,3 +73,5 @@ export const getSales = async () => {
   `);
   return result.rows;
 };
+
+
