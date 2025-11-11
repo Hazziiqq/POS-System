@@ -6,13 +6,14 @@ import productRoute from "./routes/productRoute";
 import { initSalesTable } from "./models/salesModel";
 import salesRoute from "./routes/salesRoute";
 import reportRoute from "./routes/reportRoute";
-
+import { initCustomerTable } from "./models/customerModel";
+import customerRoute from "./routes/customerRoute"
 const app = express();
 
 // Enable CORS
 app.use(
   cors({
-    origin: "http://localhost:1212", // Electron frontend URL
+    origin: "http://localhost:1212",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type"],
   })
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Initialize tables
 initProductTable();
+initCustomerTable();
 initSalesTable();
 
 // Test DB route
@@ -41,8 +43,8 @@ app.get("/", async (req, res) => {
 app.use("/api/products", productRoute);
 app.use("/api/sales", salesRoute);
 app.use("/api/reports", reportRoute);
-
+app.use("/api/customers",customerRoute)
 const PORT = 5000;
 app.listen(PORT, () =>
-  console.log(`✅ Server running on http://localhost:${PORT}`)
+  console.log(`Server running on http://localhost:${PORT}`)
 );

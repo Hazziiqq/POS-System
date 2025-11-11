@@ -8,6 +8,7 @@ import Products from "./components/Products";
 import Sales from "./components/Sales";
 import Reports from "./components/Reports";
 import Settings from "./components/Settings";
+import Customers from "./components/Customers";
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="sales" element={<Sales />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="customers" element={<Customers />} />
           </Route>
         </Routes>
       </Router>

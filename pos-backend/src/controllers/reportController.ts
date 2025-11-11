@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import pool from "../config/db";
 import { getDailyReport, getWeeklyReport, getMonthlyReport, getTopProducts, getLowStockProducts } from "../models/reportModel";
 
 // Daily Report
@@ -52,6 +53,26 @@ export const lowStock = async (req: Request, res: Response) => {
     res.status(200).json({ message: "Low stock products fetched", data });
   } catch (error) {
     console.error("Error fetching low stock products:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Total Sales
+export const totalSales = async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        SUM(quantity) AS total_items_sold,
+        SUM(total_price) AS total_revenue
+      FROM sales;
+    `);
+
+    res.status(200).json({
+      totalSales: result.rows[0].total_items_sold ?? 0,
+      totalRevenue: result.rows[0].total_revenue ?? 0,
+    });
+  } catch (error) {
+    console.error("Error fetching total sales:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

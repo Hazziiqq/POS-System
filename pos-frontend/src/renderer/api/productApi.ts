@@ -1,15 +1,41 @@
 export const fetchProducts = async () => {
   try {
     const response = await fetch("http://localhost:5000/api/products");
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch products: ${response.statusText}`);
-    }
-
+    if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
     const data = await response.json();
     return data.products;
   } catch (error) {
     console.error("Error fetching products:", error);
+    throw error;
+  }
+};
+
+export const fetchProductsCount = async (): Promise<number> => {
+  try {
+    const products = await fetchProducts();
+    return products.length; // Count of all products
+  } catch (error) {
+    console.error("Error fetching product count:", error);
+    throw error;
+  }
+};
+
+export const addProduct = async (newProduct: {
+  name: string;
+  price: number;
+  stock: number;
+  category: string;
+}) => {
+  try {
+    const response = await fetch("http://localhost:5000/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newProduct),
+    });
+    if (!response.ok) throw new Error("Failed to add product");
+    return await response.json();
+  } catch (error) {
+    console.error("Add product error:", error);
     throw error;
   }
 };
@@ -38,26 +64,6 @@ export const deleteProduct = async (id: number) => {
     return await response.json();
   } catch (error) {
     console.error("Delete error:", error);
-    throw error;
-  }
-};
-
-export const addProduct = async (newProduct: {
-  name: string;
-  price: number;
-  stock: number;
-  category: string;
-}) => {
-  try {
-    const response = await fetch("http://localhost:5000/api/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newProduct),
-    });
-    if (!response.ok) throw new Error("Failed to add product");
-    return await response.json(); 
-  } catch (error) {
-    console.error("Add product error:", error);
     throw error;
   }
 };

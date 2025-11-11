@@ -13,8 +13,10 @@ const Home: React.FC = () => {
     { name: "Dashboard", path: "/" },
     { name: "Products", path: "/products" },
     { name: "Sales", path: "/sales" },
+    { name: "Customers", path: "/customers" },
     { name: "Reports", path: "/reports" },
     { name: "Settings", path: "/settings" },
+    
   ];
 
   const handleMenuClick = (item: any) => {

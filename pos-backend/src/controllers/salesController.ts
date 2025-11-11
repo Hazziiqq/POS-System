@@ -2,12 +2,12 @@ import { Request, Response } from "express";
 import pool from "../config/db";
 import { addSale, getSales } from "../models/salesModel";
 
-// Add new sale
+// Add new sale (with optional customer_id)
 export const createSale = async (req: Request, res: Response) => {
   try {
-    const { product_id, quantity } = req.body;
+    const { product_id, quantity, customer_id } = req.body;
 
-    // Input validation
+    // Validation
     if (product_id === undefined || quantity === undefined) {
       return res.status(400).json({ message: "Product ID and quantity are required" });
     }
@@ -20,7 +20,7 @@ export const createSale = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Quantity must be a positive integer" });
     }
 
-    //Fetch product details
+    // Fetch product details
     const productResult = await pool.query("SELECT * FROM products WHERE id = $1", [product_id]);
     const product = productResult.rows[0];
 
@@ -28,16 +28,16 @@ export const createSale = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Check available stock before sale
+    // Check available stock
     if (product.stock < quantity) {
       return res.status(400).json({ message: "Not enough stock available" });
     }
 
-    // 💰 Calculate total price
+    // Calculate total price
     const totalPrice = Number(product.price) * quantity;
 
-    // Perform sale (handles stock deduction & insertion)
-    const sale = await addSale(product_id, quantity, totalPrice);
+    // Perform sale (safe transaction, stock deduction, optional customer link)
+    const sale = await addSale(product_id, quantity, totalPrice, customer_id);
 
     res.status(201).json({
       message: "Sale recorded successfully and stock updated.",
