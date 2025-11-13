@@ -1,205 +1,163 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, CircularProgress, Paper, TextField, IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions,
-} from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-import { fetchProducts, updateProduct, deleteProduct, addProduct } from "../api/productApi";
+import { Box, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, } from "@mui/material";
+import { fetchProducts, addProduct, updateProduct, deleteProduct } from "../api/productApi";
 
 interface Product {
   id: number;
   name: string;
-  price: number;
+  price: number; 
+  purchase_price: number;
+  selling_price: number;
   stock: number;
   category: string;
-  created_at: string;
+  created_at?: string;
 }
 
-const Products = () => {
+const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [newProduct, setNewProduct] = useState({
+  const [editOpen, setEditOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState<Product>({
+    id: 0,
     name: "",
     price: 0,
+    purchase_price: 0,
+    selling_price: 0,
     stock: 0,
     category: "",
   });
+  const [editProductData, setEditProductData] = useState<Product | null>(null);
 
   // Fetch products
+  const loadProducts = async () => {
+    try {
+      const data = await fetchProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error("Error loading products:", error);
+    }
+  };
+
   useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const data = await fetchProducts();
-        setProducts(data);
-      } catch (err: any) {
-        setError(err.message || "Failed to fetch products");
-      } finally {
-        setLoading(false);
-      }
-    };
     loadProducts();
   }, []);
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Auto-calc profit for Add
+  useEffect(() => {
+    setNewProduct((prev) => ({
+      ...prev,
+      price: prev.selling_price - prev.purchase_price,
+    }));
+  }, [newProduct.purchase_price, newProduct.selling_price]);
 
-  // Edit Handlers
-  const handleEditOpen = (product: Product) => setEditProduct(product);
-  const handleEditClose = () => setEditProduct(null);
-  const handleEditSave = async () => {
-    if (editProduct) {
-      try {
-        const updated = await updateProduct(editProduct.id, editProduct);
-        setProducts(
-          products.map((p) =>
-            p.id === updated.product.id ? updated.product : p
-          )
-        );
-        handleEditClose();
-      } catch (err: any) {
-        console.error(err);
-        alert("Failed to update product");
-      }
+  // Auto-calc profit for Edit
+  useEffect(() => {
+    if (editProductData) {
+      setEditProductData((prev) =>
+        prev
+          ? { ...prev, price: prev.selling_price - prev.purchase_price }
+          : prev
+      );
     }
-  };
+  }, [editProductData?.purchase_price, editProductData?.selling_price]);
 
-  // Delete Handler
-  const handleDelete = async (id: number) => {
-    if (window.confirm("Are you sure you want to delete this product?")) {
-      try {
-        await deleteProduct(id);
-        setProducts(products.filter((p) => p.id !== id));
-      } catch (err: any) {
-        console.error(err);
-        alert("Failed to delete product");
-      }
-    }
-  };
-
-  // Add Product Handlers
+  // Add Product
   const handleAddOpen = () => setAddOpen(true);
   const handleAddClose = () => {
     setAddOpen(false);
-    setNewProduct({ name: "", price: 0, stock: 0, category: "" });
+    setNewProduct({
+      id: 0,
+      name: "",
+      price: 0,
+      purchase_price: 0,
+      selling_price: 0,
+      stock: 0,
+      category: "",
+    });
   };
 
   const handleAddSave = async () => {
     try {
-      const added = await addProduct(newProduct);
-      setProducts([added.product, ...products]);
+      await addProduct(newProduct);
       handleAddClose();
-    } catch (err: any) {
-      console.error(err);
-      alert("Failed to add product");
+      loadProducts();
+    } catch (error) {
+      console.error("Add product error:", error);
     }
   };
 
-  if (loading)
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", mt: 5 }}>
-        <CircularProgress />
-      </Box>
-    );
+  // Edit Product
+  const handleEditOpen = (product: Product) => {
+    setEditProductData(product);
+    setEditOpen(true);
+  };
+  const handleEditClose = () => setEditOpen(false);
 
-  if (error)
-    return (
-      <Box sx={{ textAlign: "center", mt: 5, color: "red" }}>
-        <Typography variant="h6">{error}</Typography>
-      </Box>
-    );
+  const handleEditSave = async () => {
+    if (!editProductData) return;
+    try {
+      await updateProduct(editProductData.id, editProductData);
+      handleEditClose();
+      loadProducts();
+    } catch (error) {
+      console.error("Update product error:", error);
+    }
+  };
+
+  // Delete Product
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteProduct(id);
+      loadProducts();
+    } catch (error) {
+      console.error("Delete product error:", error);
+    }
+  };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-        <Typography variant="h5">Products</Typography>
-        <Button variant="contained" onClick={handleAddOpen}>
-          Add Product
-        </Button>
-      </Box>
+    <Box p={3}>
+      <Typography variant="h4" gutterBottom>
+        Products
+      </Typography>
+      <Button variant="contained" onClick={handleAddOpen}>
+        Add Product
+      </Button>
 
-      <TextField
-        label="Search by name or category"
-        variant="outlined"
-        fullWidth
-        sx={{ mb: 3 }}
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
+      {/* Product Table */}
+      <TableContainer component={Paper} sx={{ mt: 3 }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Purchase Price</TableCell>
+              <TableCell>Selling Price</TableCell>
+              <TableCell>Profit</TableCell>
+              <TableCell>Stock</TableCell>
+              <TableCell>Category</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+              {products.map((p) => (
+            <TableRow key={p.id}>
+            <TableCell>{p.id}</TableCell>
+            <TableCell>{p.name}</TableCell>
+            <TableCell>{p.purchase_price}</TableCell>
+            <TableCell>{p.selling_price}</TableCell>
+            <TableCell>{p.price}</TableCell>
+            <TableCell>{p.stock}</TableCell>
+            <TableCell>{p.category}</TableCell>
+            <TableCell>
+            <Button sx={{ color: 'green' }} onClick={() => handleEditOpen(p)}>Edit</Button>
+            <Button color="error" onClick={() => handleDelete(p.id)}>Delete</Button>
+      </TableCell>
+    </TableRow>
+  ))}
+</TableBody>
 
-      {filteredProducts.map((product) => (
-        <Paper
-          key={product.id}
-          sx={{
-            p: 2,
-            mb: 2,
-            backgroundColor: product.stock <= 5 ? "#3B1E1E" : "#2A2A3B",
-            color: "white",
-            borderRadius: 2,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              {product.name}
-            </Typography>
-            <Typography variant="body2">Category: {product.category}</Typography>
-            <Typography variant="body2">Price: ₨{product.price}</Typography>
-            <Typography variant="body2">Stock: {product.stock}</Typography>
-          </Box>
-
-          <Box>
-            <IconButton sx={{ color: "white" }} onClick={() => handleEditOpen(product)}>
-              <EditIcon />
-            </IconButton>
-            <IconButton sx={{ color: "red" }} onClick={() => handleDelete(product.id)}>
-              <DeleteIcon />
-            </IconButton>
-          </Box>
-        </Paper>
-      ))}
-
-      {/* Edit Dialog */}
-      <Dialog open={!!editProduct} onClose={handleEditClose}>
-        <DialogTitle>Edit Product</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <TextField
-            label="Name"
-            value={editProduct?.name || ""}
-            onChange={(e) => setEditProduct(prev => prev && { ...prev, name: e.target.value })}
-          />
-          <TextField
-            label="Price"
-            type="number"
-            value={editProduct?.price || 0}
-            onChange={(e) => setEditProduct(prev => prev && { ...prev, price: Number(e.target.value) })}
-          />
-          <TextField
-            label="Stock"
-            type="number"
-            value={editProduct?.stock || 0}
-            onChange={(e) => setEditProduct(prev => prev && { ...prev, stock: Number(e.target.value) })}
-          />
-          <TextField
-            label="Category"
-            value={editProduct?.category || ""}
-            onChange={(e) => setEditProduct(prev => prev && { ...prev, category: e.target.value })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleEditClose}>Cancel</Button>
-          <Button variant="contained" onClick={handleEditSave}>
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+        </Table>
+      </TableContainer>
 
       {/* Add Dialog */}
       <Dialog open={addOpen} onClose={handleAddClose}>
@@ -208,30 +166,111 @@ const Products = () => {
           <TextField
             label="Name"
             value={newProduct.name}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
+            onChange={(e) => setNewProduct((prev) => ({ ...prev, name: e.target.value }))}
           />
           <TextField
-            label="Price"
+            label="Purchase Price"
+            type="number"
+            value={newProduct.purchase_price}
+            onChange={(e) =>
+              setNewProduct((prev) => ({ ...prev, purchase_price: Number(e.target.value) }))
+            }
+          />
+          <TextField
+            label="Selling Price"
+            type="number"
+            value={newProduct.selling_price}
+            onChange={(e) =>
+              setNewProduct((prev) => ({ ...prev, selling_price: Number(e.target.value) }))
+            }
+          />
+          <TextField
+            label="Profit"
             type="number"
             value={newProduct.price}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, price: Number(e.target.value) }))}
+            InputProps={{ readOnly: true }}
           />
           <TextField
             label="Stock"
             type="number"
             value={newProduct.stock}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, stock: Number(e.target.value) }))}
+            onChange={(e) => setNewProduct((prev) => ({ ...prev, stock: Number(e.target.value) }))}
           />
           <TextField
             label="Category"
             value={newProduct.category}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, category: e.target.value }))}
+            onChange={(e) => setNewProduct((prev) => ({ ...prev, category: e.target.value }))}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleAddClose}>Cancel</Button>
           <Button variant="contained" onClick={handleAddSave}>
             Add
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onClose={handleEditClose}>
+        <DialogTitle>Edit Product</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {editProductData && (
+            <>
+              <TextField
+                label="Name"
+                value={editProductData.name}
+                onChange={(e) =>
+                  setEditProductData((prev) => (prev ? { ...prev, name: e.target.value } : prev))
+                }
+              />
+              <TextField
+                label="Purchase Price"
+                type="number"
+                value={editProductData.purchase_price}
+                onChange={(e) =>
+                  setEditProductData((prev) =>
+                    prev ? { ...prev, purchase_price: Number(e.target.value) } : prev
+                  )
+                }
+              />
+              <TextField
+                label="Selling Price"
+                type="number"
+                value={editProductData.selling_price}
+                onChange={(e) =>
+                  setEditProductData((prev) =>
+                    prev ? { ...prev, selling_price: Number(e.target.value) } : prev
+                  )
+                }
+              />
+              <TextField
+                label="Profit"
+                type="number"
+                value={editProductData.price}
+                InputProps={{ readOnly: true }}
+              />
+              <TextField
+                label="Stock"
+                type="number"
+                value={editProductData.stock}
+                onChange={(e) =>
+                  setEditProductData((prev) => (prev ? { ...prev, stock: Number(e.target.value) } : prev))
+                }
+              />
+              <TextField
+                label="Category"
+                value={editProductData.category}
+                onChange={(e) =>
+                  setEditProductData((prev) => (prev ? { ...prev, category: e.target.value } : prev))
+                }
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditClose}>Cancel</Button>
+          <Button variant="contained" onClick={handleEditSave}>
+            Save
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,13 +1,14 @@
 import express from "express";
 import cors from "cors";
 import pool from "./config/db";
-import { initProductTable } from "./models/productModel";
 import productRoute from "./routes/productRoute";
 import { initSalesTable } from "./models/salesModel";
 import salesRoute from "./routes/salesRoute";
 import reportRoute from "./routes/reportRoute";
 import { initCustomerTable } from "./models/customerModel";
 import customerRoute from "./routes/customerRoute"
+import { initProductTable } from "./models/productModel";
+import purchaseRoute from "./routes/purchaseRoute"
 const app = express();
 
 // Enable CORS
@@ -27,6 +28,7 @@ app.use(express.urlencoded({ extended: true }));
 initProductTable();
 initCustomerTable();
 initSalesTable();
+initProductTable();
 
 // Test DB route
 app.get("/", async (req, res) => {
@@ -44,6 +46,7 @@ app.use("/api/products", productRoute);
 app.use("/api/sales", salesRoute);
 app.use("/api/reports", reportRoute);
 app.use("/api/customers",customerRoute)
+app.use("/api/purchases",purchaseRoute)
 const PORT = 5000;
 app.listen(PORT, () =>
   console.log(`Server running on http://localhost:${PORT}`)

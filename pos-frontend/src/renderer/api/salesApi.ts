@@ -36,7 +36,7 @@ export const fetchRecentSales = async (): Promise<
     );
     return sorted.slice(0, 5);
   } catch (error) {
-    console.error("Error fetching recent sales:", error);
     throw error;
   }
 };
+

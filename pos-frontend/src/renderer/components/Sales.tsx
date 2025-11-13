@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, CircularProgress, Paper, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem,
-} from "@mui/material";
+import { Box, Typography, CircularProgress, Paper, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, } from "@mui/material";
 import { fetchSale, addSale } from "../api/salesApi";
 import { fetchProducts } from "../api/productApi";
-import { fetchCustomers } from "../api/customersApi";
+import { fetchCustomers, addCustomer } from "../api/customersApi";
 
 interface Sale {
   id: number;
@@ -30,23 +29,37 @@ interface Customer {
 interface NewSale {
   product_id: number;
   quantity: number;
-  customer_id?: number;
+  customer_id?: number | null;
 }
 
-const Sales = () => {
+interface NewCustomer {
+  name: string;
+  phone: string;
+  address: string;
+}
+
+const Sales: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [addOpen, setAddOpen] = useState(false);
   const [newSale, setNewSale] = useState<NewSale>({
     product_id: 0,
     quantity: 1,
-    customer_id: undefined,
+    customer_id: null,
   });
 
-  // Load sales, products, and customers
+  const [useNewCustomer, setUseNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState<NewCustomer>({
+    name: "",
+    phone: "",
+    address: "",
+  });
+
+  // Load data
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -71,7 +84,9 @@ const Sales = () => {
   const handleAddOpen = () => setAddOpen(true);
   const handleAddClose = () => {
     setAddOpen(false);
-    setNewSale({ product_id: 0, quantity: 1, customer_id: undefined });
+    setNewSale({ product_id: 0, quantity: 1, customer_id: null });
+    setUseNewCustomer(false);
+    setNewCustomer({ name: "", phone: "", address: "" });
   };
 
   const handleAddSave = async () => {
@@ -81,12 +96,30 @@ const Sales = () => {
         return;
       }
 
-      const added = await addSale(newSale);
+      let customerId = newSale.customer_id;
+
+      // If new customer info provided, create it first
+      if (useNewCustomer) {
+        if (!newCustomer.name || !newCustomer.phone) {
+          alert("Please provide at least name and phone for the new customer.");
+          return;
+        }
+        const createdCustomer = await addCustomer(newCustomer);
+        customerId = createdCustomer.id;
+      }
+
+      const payload = {
+        product_id: newSale.product_id,
+        quantity: newSale.quantity,
+        ...(customerId ? { customer_id: customerId } : {}),
+      };
+
+      const added = await addSale(payload);
       setSales([added.sale, ...sales]);
       handleAddClose();
     } catch (err: any) {
       console.error(err);
-      alert("Failed to add sale");
+      alert("Failed to add sale: " + (err.message || ""));
     }
   };
 
@@ -105,7 +138,7 @@ const Sales = () => {
     );
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 3 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
         <Typography variant="h5">Sales</Typography>
         <Button variant="contained" onClick={handleAddOpen}>
@@ -113,40 +146,38 @@ const Sales = () => {
         </Button>
       </Box>
 
-      {sales.map((sale) => (
-        <Paper
-          key={sale.id}
-          sx={{
-            p: 2,
-            mb: 2,
-            backgroundColor: "#2A2A3B",
-            color: "white",
-            borderRadius: 2,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
-              {sale.product_name}
-            </Typography>
-            <Typography variant="body2">Quantity: {sale.quantity}</Typography>
-            <Typography variant="body2">Total: ₨{sale.total_price}</Typography>
-            <Typography variant="body2">
-              Customer: {sale.customer_name || "N/A"}
-            </Typography>
-            <Typography variant="body2">
-              Date: {new Date(sale.sale_date).toLocaleDateString()}
-            </Typography>
-          </Box>
-        </Paper>
-      ))}
+      {/* Sales Table */}
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Product</TableCell>
+              <TableCell>Quantity</TableCell>
+              <TableCell>Total Price</TableCell>
+              <TableCell>Customer</TableCell>
+              <TableCell>Date</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sales.map((sale) => (
+              <TableRow key={sale.id}>
+                <TableCell>{sale.id}</TableCell>
+                <TableCell>{sale.product_name}</TableCell>
+                <TableCell>{sale.quantity}</TableCell>
+                <TableCell>₨{sale.total_price}</TableCell>
+                <TableCell>{sale.customer_name || "N/A"}</TableCell>
+                <TableCell>{new Date(sale.sale_date).toLocaleDateString()}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Add Sale Dialog */}
       <Dialog open={addOpen} onClose={handleAddClose}>
         <DialogTitle>Add Sale</DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <TextField
             select
             label="Product"
@@ -154,7 +185,7 @@ const Sales = () => {
             onChange={(e) =>
               setNewSale((prev) => ({ ...prev, product_id: Number(e.target.value) }))
             }
-            helperText="Select a product for this sale"
+            helperText="Select a product"
           >
             <MenuItem value={0} disabled>
               -- Select a product --
@@ -167,16 +198,30 @@ const Sales = () => {
           </TextField>
 
           <TextField
+            type="number"
+            label="Quantity"
+            value={newSale.quantity}
+            onChange={(e) =>
+              setNewSale((prev) => ({ ...prev, quantity: Number(e.target.value) }))
+            }
+          />
+
+          {/* Customer selection */}
+          <TextField
             select
             label="Customer"
-            value={newSale.customer_id || 0}
-            onChange={(e) =>
-              setNewSale((prev) => ({
-                ...prev,
-                customer_id: Number(e.target.value) || undefined,
-              }))
-            }
-            helperText="Select a customer (optional)"
+            value={newSale.customer_id ?? (useNewCustomer ? -1 : 0)}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (val === -1) {
+                setUseNewCustomer(true);
+                setNewSale((prev) => ({ ...prev, customer_id: null }));
+              } else {
+                setUseNewCustomer(false);
+                setNewSale((prev) => ({ ...prev, customer_id: val }));
+              }
+            }}
+            helperText="Select existing customer or add new"
           >
             <MenuItem value={0}>-- No Customer --</MenuItem>
             {customers.map((c) => (
@@ -184,23 +229,36 @@ const Sales = () => {
                 {c.name}
               </MenuItem>
             ))}
+            <MenuItem value={-1}>+ Add New Customer</MenuItem>
           </TextField>
 
-          <TextField
-            label="Quantity"
-            type="number"
-            value={newSale.quantity}
-            onChange={(e) =>
-              setNewSale((prev) => ({ ...prev, quantity: Number(e.target.value) }))
-            }
-          />
+          {/* New customer fields */}
+          {useNewCustomer && (
+            <>
+              <TextField
+                label="Customer Name"
+                value={newCustomer.name}
+                onChange={(e) => setNewCustomer((prev) => ({ ...prev, name: e.target.value }))}
+              />
+              <TextField
+                label="Phone Number"
+                value={newCustomer.phone}
+                onChange={(e) => setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))}
+              />
+              <TextField
+                label="Address"
+                value={newCustomer.address}
+                onChange={(e) => setNewCustomer((prev) => ({ ...prev, address: e.target.value }))}
+              />
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleAddClose}>Cancel</Button>
           <Button
             variant="contained"
             onClick={handleAddSave}
-            disabled={newSale.product_id === 0 || newSale.quantity <= 0}
+            disabled={!newSale.product_id || newSale.quantity <= 0}
           >
             Add
           </Button>
