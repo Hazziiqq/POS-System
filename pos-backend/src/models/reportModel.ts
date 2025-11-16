@@ -1,73 +1,82 @@
-import pool from "../config/db";
+import { AppDataSource } from "../config/data-source";
+import { Sale } from "./salesModel";
+import { Product } from "./productModel";
 
-// daily Sales Report
+const saleRepo = AppDataSource.getRepository(Sale);
+const productRepo = AppDataSource.getRepository(Product);
+
+// Daily Sales Report
 export const getDailyReport = async () => {
-  const result = await pool.query(`
-    SELECT 
-      DATE(sale_date) AS date,
-      SUM(quantity) AS total_items_sold,
-      SUM(total_price) AS total_revenue
-    FROM sales
-    WHERE DATE(sale_date) = CURRENT_DATE
-    GROUP BY DATE(sale_date);
-  `);
-  return result.rows;
+  return await saleRepo
+    .createQueryBuilder("s")
+    .select("DATE(s.sale_date)", "date")
+    .addSelect("SUM(s.quantity)", "total_items_sold")
+    .addSelect("SUM(s.total_price)", "total_revenue")
+    .where("DATE(s.sale_date) = CURRENT_DATE")
+    .groupBy("DATE(s.sale_date)")
+    .getRawMany();
 };
 
 // Weekly Sales Report
 export const getWeeklyReport = async () => {
-  const result = await pool.query(`
-    SELECT 
-      DATE_TRUNC('week', sale_date) AS week_start,
-      SUM(quantity) AS total_items_sold,
-      SUM(total_price) AS total_revenue
-    FROM sales
-    WHERE sale_date >= NOW() - INTERVAL '7 days'
-    GROUP BY DATE_TRUNC('week', sale_date)
-    ORDER BY week_start DESC;
-  `);
-  return result.rows;
+  return await saleRepo
+    .createQueryBuilder("s")
+    .select("DATE_TRUNC('week', s.sale_date)", "week_start")
+    .addSelect("SUM(s.quantity)", "total_items_sold")
+    .addSelect("SUM(s.total_price)", "total_revenue")
+    .where("s.sale_date >= NOW() - INTERVAL '7 days'")
+    .groupBy("DATE_TRUNC('week', s.sale_date)")
+    .orderBy("week_start", "DESC")
+    .getRawMany();
 };
 
-// monthly Sales Report
+// Monthly Sales Report
 export const getMonthlyReport = async () => {
-  const result = await pool.query(`
-    SELECT 
-      DATE_TRUNC('month', sale_date) AS month,
-      SUM(quantity) AS total_items_sold,
-      SUM(total_price) AS total_revenue
-    FROM sales
-    WHERE sale_date >= DATE_TRUNC('month', CURRENT_DATE)
-    GROUP BY DATE_TRUNC('month', sale_date)
-    ORDER BY month DESC;
-  `);
-  return result.rows;
+  return await saleRepo
+    .createQueryBuilder("s")
+    .select("DATE_TRUNC('month', s.sale_date)", "month")
+    .addSelect("SUM(s.quantity)", "total_items_sold")
+    .addSelect("SUM(s.total_price)", "total_revenue")
+    .where("s.sale_date >= DATE_TRUNC('month', CURRENT_DATE)")
+    .groupBy("DATE_TRUNC('month', s.sale_date)")
+    .orderBy("month", "DESC")
+    .getRawMany();
 };
 
-// top selling Products
+// Top Selling Products
 export const getTopProducts = async () => {
-  const result = await pool.query(`
-    SELECT 
-      p.name AS product_name,
-      SUM(s.quantity) AS total_sold,
-      SUM(s.total_price) AS total_revenue
-    FROM sales s
-    JOIN products p ON s.product_id = p.id
-    GROUP BY p.name
-    ORDER BY total_sold DESC
-    LIMIT 5;
-  `);
-  return result.rows;
+  return await saleRepo
+    .createQueryBuilder("s")
+    .leftJoin(Product, "p", "s.product_id = p.id")
+    .select("p.name", "product_name")
+    .addSelect("SUM(s.quantity)", "total_sold")
+    .addSelect("SUM(s.total_price)", "total_revenue")
+    .groupBy("p.name")
+    .orderBy("total_sold", "DESC")
+    .limit(5)
+    .getRawMany();
 };
 
 // Low Stock Products
 export const getLowStockProducts = async () => {
-  const result = await pool.query(`
-    SELECT 
-      id, name, stock, category
-    FROM products
-    WHERE stock <= 5
-    ORDER BY stock ASC;
-  `);
-  return result.rows;
+  return await productRepo
+    .createQueryBuilder("p")
+    .select(["p.id", "p.name", "p.stock", "p.category"])
+    .where("p.stock <= :limit", { limit: 5 })
+    .orderBy("p.stock", "ASC")
+    .getMany();
+};
+
+// Total Sales
+export const getTotalSales = async () => {
+  const result = await saleRepo
+    .createQueryBuilder("s")
+    .select("SUM(s.quantity)", "total_items_sold")
+    .addSelect("SUM(s.total_price)", "total_revenue")
+    .getRawOne();
+
+  return {
+    totalSales: Number(result.total_items_sold) || 0,
+    totalRevenue: Number(result.total_revenue) || 0,
+  };
 };

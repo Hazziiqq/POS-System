@@ -1,64 +1,24 @@
-import pool from "../config/db";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from "typeorm";
+import { Product } from "./productModel";
 
-// Create Purchase Table
-export const initPurchaseTable = async () => {
-  const query = `
-    CREATE TABLE IF NOT EXISTS purchases (
-      id SERIAL PRIMARY KEY,
-      product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
-      quantity INTEGER NOT NULL,
-      cost_price NUMERIC(10,2) NOT NULL,
-      total_cost NUMERIC(12,2) NOT NULL,
-      purchase_date TIMESTAMP DEFAULT NOW()
-    );
-  `;
-  await pool.query(query);
-  console.log("Purchase table ready");
-};
+@Entity("purchases")
+export class Purchase {
+  @PrimaryGeneratedColumn()
+  id: number = 0;
 
-// Add new purchase
-export const addPurchase = async ( 
-  productId: number,
-  quantity: number,
-  costPrice: number
-) => {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  @ManyToOne(() => Product)
+  @JoinColumn({ name: "product_id" })
+  product!: Product;
 
-    const totalCost = quantity * costPrice;
+  @Column({ type: "integer" })
+  quantity: number = 0;
 
-    // Step 1: Insert purchase record
-    const purchaseResult = await client.query(
-      `INSERT INTO purchases (product_id, quantity, cost_price, total_cost)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [productId, quantity, costPrice, totalCost]
-    );
+  @Column({ type: "numeric", precision: 10, scale: 2 })
+  cost_price: number = 0;
 
-    // Step 2: Update stock in products table
-    await client.query(
-      `UPDATE products SET stock = stock + $1, cost_price = $2 WHERE id = $3`,
-      [quantity, costPrice, productId]
-    );
+  @Column({ type: "numeric", precision: 12, scale: 2 })
+  total_cost: number = 0;
 
-    await client.query("COMMIT");
-    return purchaseResult.rows[0];
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-};
-
-// Get all purchases
-export const getPurchases = async () => {
-  const result = await pool.query(`
-    SELECT p.*, pr.name AS product_name
-    FROM purchases p
-    JOIN products pr ON p.product_id = pr.id
-    ORDER BY p.id DESC;
-  `);
-  return result.rows;
-};
+  @CreateDateColumn({ type: "timestamp", name: "purchase_date" })
+  purchase_date: Date = new Date();
+}

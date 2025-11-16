@@ -1,5 +1,10 @@
 {
   "dependencies": {
-    "recharts": "^3.3.0"
+    "recharts": "^3.3.0",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.27"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1"
   }
 }

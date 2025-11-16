@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
-import { addProduct, getProducts, updateProduct, deleteProduct } from "../models/productModel";
+import { Product } from "../models/productModel";
+import { AppDataSource } from "../config/data-source";
+
+// Get repository
+const productRepo = AppDataSource.getRepository(Product);
 
 // Add a new product
 export const createProduct = async (req: Request, res: Response) => {
@@ -10,18 +14,20 @@ export const createProduct = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Name, selling price, and price are required" });
     }
 
-    const newProduct = await addProduct(
+    const newProduct = productRepo.create({
       name,
       price,
-      purchase_price || 0,
+      purchase_price: purchase_price || 0,
       selling_price,
-      stock || 0,
-      category
-    );
+      stock: stock || 0,
+      category,
+    });
+
+    const savedProduct = await productRepo.save(newProduct);
 
     res.status(201).json({
       message: "Product added successfully",
-      product: newProduct,
+      product: savedProduct,
     });
   } catch (error: any) {
     console.error("Error creating product:", error.message);
@@ -32,7 +38,7 @@ export const createProduct = async (req: Request, res: Response) => {
 // Get all products
 export const getAllProducts = async (req: Request, res: Response) => {
   try {
-    const products = await getProducts();
+    const products = await productRepo.find({ order: { id: "ASC" } });
     res.status(200).json({
       message: "Products fetched successfully",
       products,
@@ -53,21 +59,21 @@ export const editProduct = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const updated = await updateProduct(
-      Number(id),
-      name,
-      price,
-      purchase_price || 0,
-      selling_price,
-      stock || 0,
-      category
-    );
+    const existingProduct = await productRepo.findOneBy({ id: Number(id) });
+    if (!existingProduct) return res.status(404).json({ message: "Product not found" });
 
-    if (!updated) return res.status(404).json({ message: "Product not found" });
+    existingProduct.name = name;
+    existingProduct.price = price;
+    existingProduct.purchase_price = purchase_price || 0;
+    existingProduct.selling_price = selling_price;
+    existingProduct.stock = stock || 0;
+    existingProduct.category = category;
+
+    const updatedProduct = await productRepo.save(existingProduct);
 
     res.status(200).json({
       message: "Product updated successfully",
-      product: updated,
+      product: updatedProduct,
     });
   } catch (error: any) {
     console.error("Error updating product:", error.message);
@@ -80,13 +86,14 @@ export const removeProduct = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const deleted = await deleteProduct(Number(id));
+    const productToDelete = await productRepo.findOneBy({ id: Number(id) });
+    if (!productToDelete) return res.status(404).json({ message: "Product not found" });
 
-    if (!deleted) return res.status(404).json({ message: "Product not found" });
+    await productRepo.remove(productToDelete);
 
     res.status(200).json({
       message: "Product deleted successfully",
-      product: deleted,
+      product: productToDelete,
     });
   } catch (error: any) {
     console.error("Error deleting product:", error.message);

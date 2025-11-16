@@ -1,47 +1,63 @@
 import { Request, Response } from "express";
-import { addSale, getSales } from "../models/salesModel";
+import { Sale } from "../models/salesModel";
+import { Product } from "../models/productModel";
+import { AppDataSource } from "../config/data-source";
 
 // Add new sale
 export const createSale = async (req: Request, res: Response) => {
+  const { product_id, quantity, customer_id } = req.body;
+
+  if (!product_id || !quantity || quantity <= 0) {
+    return res.status(400).json({ message: "Invalid product or quantity" });
+  }
+
+  const queryRunner = AppDataSource.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
   try {
-    const { product_id, quantity, customer_id } = req.body;
+    const productRepo = queryRunner.manager.getRepository(Product);
+    const saleRepo = queryRunner.manager.getRepository(Sale);
 
-    // Validation
-    if (product_id === undefined || quantity === undefined) {
-      return res.status(400).json({ message: "Product ID and quantity are required" });
-    }
+    const product = await productRepo.findOne({ where: { id: product_id } });
+    if (!product) throw new Error("Product not found");
 
-    if (typeof product_id !== "number" || typeof quantity !== "number") {
-      return res.status(400).json({ message: "Product ID and quantity must be numbers" });
-    }
+    if (product.stock < quantity) throw new Error("Not enough stock");
 
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      return res.status(400).json({ message: "Quantity must be a positive integer" });
-    }
+    // Deduct stock
+    product.stock -= quantity;
+    await productRepo.save(product);
 
-    // Add sale (deduct stock inside model)
-    const sale = await addSale(product_id, quantity, customer_id);
-
-    res.status(201).json({
-      message: "Sale recorded successfully",
-      sale, // contains selling_price, purchase_price, profit
+    const totalPrice = Number(product.selling_price) * quantity;
+    const sale = saleRepo.create({
+      product_id,
+      quantity,
+      total_price: totalPrice,
+      customer_id,
     });
-  } catch (error: any) {
-    console.error("Error creating sale:", error.message);
-    res.status(500).json({ message: error.message || "Internal server error" });
+    await saleRepo.save(sale);
+
+    await queryRunner.commitTransaction();
+    res.status(201).json({ message: "Sale recorded successfully", sale });
+  } catch (err: any) {
+    await queryRunner.rollbackTransaction();
+    console.error("Error creating sale:", err.message);
+    res.status(500).json({ message: err.message || "Internal server error" });
+  } finally {
+    await queryRunner.release();
   }
 };
 
 // Get all sales
 export const getAllSales = async (req: Request, res: Response) => {
   try {
-    const sales = await getSales();
-    res.status(200).json({
-      message: "Sales fetched successfully",
-      sales,
+    const sales = await Sale.find({
+      relations: ["product", "customer"],
+      order: { id: "DESC" },
     });
-  } catch (error) {
-    console.error("Error fetching sales:", error);
+    res.status(200).json({ message: "Sales fetched successfully", sales });
+  } catch (err) {
+    console.error("Error fetching sales:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 };
